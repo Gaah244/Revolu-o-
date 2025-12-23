@@ -173,6 +173,7 @@ class ChatResponse(BaseModel):
     username: str
     role: str = "externo"
     content: str
+    image_url: Optional[str] = None
     is_ai: bool
     created_at: str
 
