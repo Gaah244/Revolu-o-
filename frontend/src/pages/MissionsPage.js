@@ -202,8 +202,8 @@ export default function MissionsPage() {
   const fetchMissions = async () => {
     try {
       const params = {};
-      if (statusFilter) params.status = statusFilter;
-      if (categoryFilter) params.category = categoryFilter;
+      if (statusFilter && statusFilter !== "all") params.status = statusFilter;
+      if (categoryFilter && categoryFilter !== "all") params.category = categoryFilter;
       const response = await api.getMissions(params);
       setMissions(response.data);
     } catch (error) {

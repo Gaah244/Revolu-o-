@@ -160,7 +160,7 @@ export default function ReportsPage() {
   const fetchReports = async () => {
     try {
       const params = {};
-      if (statusFilter) params.status = statusFilter;
+      if (statusFilter && statusFilter !== "all") params.status = statusFilter;
       const response = await api.getReports(params);
       setReports(response.data);
     } catch (error) {
