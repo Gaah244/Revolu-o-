@@ -478,6 +478,17 @@ async def complete_mission(mission_id: str, user: dict = Depends(get_current_use
         {"$inc": {"missions_completed": 1, "rank_points": 100}}
     )
     
+    # Check and award badges
+    await check_and_award_badges(user["id"])
+    
+    # Notify user
+    await create_notification(
+        user["id"],
+        "🎯 Missão Concluída!",
+        f"Parabéns! Você completou a missão '{mission['title']}' e ganhou +100 pontos!",
+        "mission"
+    )
+    
     updated_mission = await db.missions.find_one({"id": mission_id}, {"_id": 0})
     return MissionResponse(**updated_mission)
 
