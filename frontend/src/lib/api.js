@@ -58,8 +58,19 @@ export const api = {
     axios.post(`${API}/tools/upload`, formData, {
       headers: { ...getAuthHeaders(), "Content-Type": "multipart/form-data" },
     }),
+  downloadTool: (toolId) =>
+    axios.get(`${API}/tools/download/${toolId}`, { 
+      headers: getAuthHeaders(), 
+      responseType: 'blob' 
+    }),
   deleteTool: (toolId) =>
     axios.delete(`${API}/tools/${toolId}`, { headers: getAuthHeaders() }),
+
+  // Badges
+  getBadges: () =>
+    axios.get(`${API}/badges`, { headers: getAuthHeaders() }),
+  getUserBadges: (userId) =>
+    axios.get(`${API}/badges/user/${userId}`, { headers: getAuthHeaders() }),
 
   // Chat
   getChatMessages: (limit = 50) =>
