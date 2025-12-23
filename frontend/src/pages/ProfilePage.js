@@ -1,4 +1,6 @@
+import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
+import { api } from "../lib/api";
 import {
   User,
   Mail,
@@ -7,6 +9,12 @@ import {
   AlertTriangle,
   Trophy,
   Calendar,
+  Award,
+  Crosshair,
+  Crown,
+  Eye,
+  Zap,
+  Star,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
@@ -29,8 +37,44 @@ const rankTiers = [
   { name: "LENDA", min: 5000, max: Infinity, color: "text-accent" },
 ];
 
+const badgeIcons = {
+  target: Target,
+  crosshair: Crosshair,
+  award: Award,
+  crown: Crown,
+  "alert-triangle": AlertTriangle,
+  eye: Eye,
+  zap: Zap,
+  shield: Shield,
+  star: Star,
+};
+
 export default function ProfilePage() {
   const { user } = useAuth();
+  const [badges, setBadges] = useState([]);
+  const [userBadges, setUserBadges] = useState([]);
+  const [loadingBadges, setLoadingBadges] = useState(true);
+
+  useEffect(() => {
+    const fetchBadges = async () => {
+      try {
+        const [allBadgesRes, userBadgesRes] = await Promise.all([
+          api.getBadges(),
+          api.getUserBadges(user.id),
+        ]);
+        setBadges(allBadgesRes.data);
+        setUserBadges(userBadgesRes.data);
+      } catch (error) {
+        console.error("Error fetching badges:", error);
+      } finally {
+        setLoadingBadges(false);
+      }
+    };
+
+    if (user?.id) {
+      fetchBadges();
+    }
+  }, [user?.id]);
 
   const currentRank = rankTiers.find(
     (tier) => user.rank_points >= tier.min && user.rank_points < tier.max
@@ -42,6 +86,8 @@ export default function ProfilePage() {
     : 100;
 
   const roleConfig = roles[user?.role] || roles.externo;
+
+  const earnedBadgeIds = userBadges.map(b => b.id);
 
   return (
     <div className="space-y-6" data-testid="profile-page">
@@ -155,13 +201,13 @@ export default function ProfilePage() {
 
               <div className="p-4 bg-white/5 border border-white/10">
                 <div className="flex items-center gap-2 mb-2">
-                  <Shield className="w-5 h-5 text-accent" />
-                  <span className="text-xs text-muted-foreground">NÍVEL</span>
+                  <Award className="w-5 h-5 text-accent" />
+                  <span className="text-xs text-muted-foreground">BADGES</span>
                 </div>
                 <p className="text-3xl font-display font-bold text-accent">
-                  {Math.floor(user?.rank_points / 100) + 1}
+                  {userBadges.length}
                 </p>
-                <p className="text-xs text-muted-foreground mt-1">atual</p>
+                <p className="text-xs text-muted-foreground mt-1">conquistados</p>
               </div>
             </div>
 
@@ -191,6 +237,58 @@ export default function ProfilePage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Badges Section */}
+      <Card className="hud-panel border-white/10">
+        <CardHeader className="border-b border-white/10">
+          <CardTitle className="font-display text-lg tracking-wider flex items-center gap-2">
+            <Award className="w-5 h-5 text-accent" />
+            CONQUISTAS & BADGES
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-6">
+          {loadingBadges ? (
+            <div className="text-center text-muted-foreground py-8">
+              Carregando badges...
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+              {badges.map((badge) => {
+                const isEarned = earnedBadgeIds.includes(badge.id);
+                const IconComponent = badgeIcons[badge.icon] || Award;
+                
+                return (
+                  <div
+                    key={badge.id}
+                    className={`p-4 border text-center transition-all ${
+                      isEarned
+                        ? "border-accent bg-accent/10"
+                        : "border-white/10 bg-white/5 opacity-40"
+                    }`}
+                  >
+                    <IconComponent
+                      className={`w-8 h-8 mx-auto mb-2 ${
+                        isEarned ? "text-accent" : "text-muted-foreground"
+                      }`}
+                    />
+                    <p className={`text-sm font-bold ${isEarned ? "text-white" : "text-muted-foreground"}`}>
+                      {badge.name}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {badge.description}
+                    </p>
+                    {!isEarned && (
+                      <p className="text-xs text-accent mt-2">
+                        {badge.requirement_value} {badge.requirement_type}
+                      </p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Points Guide */}
       <Card className="hud-panel border-white/10">
