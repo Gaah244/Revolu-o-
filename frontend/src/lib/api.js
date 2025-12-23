@@ -115,6 +115,10 @@ export const api = {
   // Site Check
   checkSite: (url) =>
     axios.post(`${API}/site-check`, null, { headers: getAuthHeaders(), params: { url } }),
+
+  // Get user updated data (for real-time points)
+  refreshUser: () =>
+    axios.get(`${API}/auth/me`, { headers: getAuthHeaders() }),
 };
 
 export default api;
