@@ -8,14 +8,30 @@ import {
   Bot,
   User,
   Sparkles,
+  Shield,
+  Star,
+  Sword,
+  Users,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { ScrollArea } from "../components/ui/scroll-area";
+import { Badge } from "../components/ui/badge";
+
+const roleConfig = {
+  admin: { label: "ADMIN", color: "bg-accent/20 text-accent border-accent", icon: Shield },
+  tenente: { label: "TENENTE", color: "bg-destructive/20 text-destructive border-destructive", icon: Star },
+  elite: { label: "ELITE", color: "bg-secondary/20 text-secondary border-secondary", icon: Sword },
+  soldado: { label: "SOLDADO", color: "bg-primary/20 text-primary border-primary", icon: User },
+  externo: { label: "EXTERNO", color: "bg-muted/20 text-muted-foreground border-muted-foreground", icon: Users },
+  ai: { label: "IA", color: "bg-secondary/20 text-secondary border-secondary", icon: Bot },
+};
 
 const ChatMessage = ({ message, isOwn }) => {
   const isAi = message.is_ai;
+  const role = roleConfig[message.role] || roleConfig.externo;
+  const RoleIcon = role.icon;
 
   return (
     <div
@@ -31,13 +47,13 @@ const ChatMessage = ({ message, isOwn }) => {
         {isAi ? (
           <Bot className="w-5 h-5 text-secondary" />
         ) : (
-          <User className="w-5 h-5 text-primary" />
+          <RoleIcon className={`w-5 h-5 ${role.color.includes("text-") ? role.color.split(" ").find(c => c.startsWith("text-")) : "text-primary"}`} />
         )}
       </div>
       <div
         className={`flex-1 max-w-[80%] ${isOwn && !isAi ? "text-right" : ""}`}
       >
-        <div className="flex items-center gap-2 mb-1">
+        <div className={`flex items-center gap-2 mb-1 ${isOwn && !isAi ? "justify-end" : ""}`}>
           <span
             className={`text-xs font-bold ${
               isAi ? "text-secondary" : "text-primary"
@@ -45,6 +61,11 @@ const ChatMessage = ({ message, isOwn }) => {
           >
             {message.username}
           </span>
+          {!isAi && (
+            <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${role.color}`}>
+              {role.label}
+            </Badge>
+          )}
           <span className="text-xs text-muted-foreground">
             {new Date(message.created_at).toLocaleTimeString("pt-BR", {
               hour: "2-digit",
@@ -69,7 +90,7 @@ const ChatMessage = ({ message, isOwn }) => {
 };
 
 export default function ChatPage() {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState("");
   const [loading, setLoading] = useState(true);
@@ -90,13 +111,16 @@ export default function ChatPage() {
 
   useEffect(() => {
     fetchMessages();
-    const interval = setInterval(fetchMessages, 5000);
+    const interval = setInterval(fetchMessages, 3000);
     return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
     if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      const scrollElement = scrollRef.current.querySelector('[data-radix-scroll-area-viewport]');
+      if (scrollElement) {
+        scrollElement.scrollTop = scrollElement.scrollHeight;
+      }
     }
   }, [messages]);
 
@@ -125,18 +149,8 @@ export default function ChatPage() {
 
     try {
       const response = await api.sendAiMessage(question);
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `user-${Date.now()}`,
-          user_id: user.id,
-          username: user.username,
-          content: question,
-          is_ai: false,
-          created_at: new Date().toISOString(),
-        },
-        response.data,
-      ]);
+      // Refresh messages to get both user message and AI response
+      await fetchMessages();
     } catch (error) {
       toast.error("Erro ao obter resposta da IA");
       setNewMessage(question);
@@ -156,7 +170,7 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="h-[calc(100vh-8rem)] flex flex-col" data-testid="chat-page">
+    <div className="h-[calc(100vh-6rem)] flex flex-col" data-testid="chat-page">
       {/* Header */}
       <div className="mb-4">
         <h1 className="font-display text-3xl font-bold text-white tracking-wider flex items-center gap-3">
@@ -168,8 +182,8 @@ export default function ChatPage() {
         </p>
       </div>
 
-      {/* Chat Container */}
-      <Card className="hud-panel border-white/10 flex-1 flex flex-col overflow-hidden">
+      {/* Chat Container - Increased height */}
+      <Card className="hud-panel border-white/10 flex-1 flex flex-col overflow-hidden min-h-[500px]">
         <CardHeader className="border-b border-white/10 py-3 flex-shrink-0">
           <div className="flex items-center justify-between">
             <CardTitle className="font-display text-sm tracking-wider flex items-center gap-2">
@@ -183,9 +197,9 @@ export default function ChatPage() {
           </div>
         </CardHeader>
 
-        {/* Messages */}
-        <ScrollArea ref={scrollRef} className="flex-1 p-4">
-          <div className="space-y-4">
+        {/* Messages - Larger area */}
+        <ScrollArea ref={scrollRef} className="flex-1 p-4 min-h-[400px]">
+          <div className="space-y-4 pb-4">
             {messages.length > 0 ? (
               messages.map((message) => (
                 <ChatMessage
@@ -210,6 +224,9 @@ export default function ChatPage() {
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-xs font-bold text-secondary">ARIA</span>
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0 bg-secondary/20 text-secondary border-secondary">
+                      IA
+                    </Badge>
                   </div>
                   <div className="p-4 bg-secondary/10 border border-secondary/30">
                     <p className="text-sm text-secondary animate-pulse">
@@ -230,16 +247,16 @@ export default function ChatPage() {
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
               placeholder="Digite sua mensagem..."
-              className="flex-1 input-terminal rounded-none"
+              className="flex-1 input-terminal rounded-none h-12 text-base"
               disabled={sending || aiLoading}
             />
             <Button
               type="submit"
               data-testid="send-message-btn"
               disabled={!newMessage.trim() || sending || aiLoading}
-              className="btn-cyber rounded-none px-4"
+              className="btn-cyber rounded-none px-6 h-12"
             >
-              <Send className="w-4 h-4" />
+              <Send className="w-5 h-5" />
             </Button>
             <Button
               type="button"
@@ -247,9 +264,9 @@ export default function ChatPage() {
               onClick={handleAskAI}
               disabled={!newMessage.trim() || aiLoading}
               variant="outline"
-              className="border-secondary text-secondary hover:bg-secondary hover:text-black rounded-none px-4"
+              className="border-secondary text-secondary hover:bg-secondary hover:text-black rounded-none px-6 h-12"
             >
-              <Sparkles className="w-4 h-4 mr-2" />
+              <Sparkles className="w-5 h-5 mr-2" />
               {aiLoading ? "..." : "IA"}
             </Button>
           </form>
