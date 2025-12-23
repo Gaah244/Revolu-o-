@@ -841,6 +841,14 @@ import shutil
 UPLOAD_DIR = ROOT_DIR / "uploads" / "tools"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
+CHAT_UPLOAD_DIR = ROOT_DIR / "uploads" / "chat"
+CHAT_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+REPORTS_UPLOAD_DIR = ROOT_DIR / "uploads" / "reports"
+REPORTS_UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+from fastapi.staticfiles import StaticFiles
+
 @api_router.post("/tools/upload")
 async def upload_tool_file(
     name: str,
@@ -856,8 +864,9 @@ async def upload_tool_file(
     file_path = UPLOAD_DIR / filename
     
     # Save file
+    content = await file.read()
     with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+        buffer.write(content)
     
     # Create tool entry
     tool_id = str(uuid.uuid4())
@@ -898,6 +907,193 @@ async def download_tool(tool_id: str, user: dict = Depends(get_current_user)):
         filename=tool.get("file_name", file_path.name),
         media_type="application/octet-stream"
     )
+
+# ==================== CHAT IMAGE UPLOAD ====================
+
+@api_router.post("/chat/upload-image")
+async def upload_chat_image(
+    file: UploadFile = File(...),
+    user: dict = Depends(get_current_user)
+):
+    # Validate file type
+    allowed_types = ["image/jpeg", "image/png", "image/gif", "image/webp"]
+    if file.content_type not in allowed_types:
+        raise HTTPException(status_code=400, detail="Only images are allowed (jpg, png, gif, webp)")
+    
+    # Generate unique filename
+    file_id = str(uuid.uuid4())
+    file_extension = Path(file.filename).suffix if file.filename else ".jpg"
+    filename = f"{file_id}{file_extension}"
+    file_path = CHAT_UPLOAD_DIR / filename
+    
+    # Save file
+    content = await file.read()
+    with open(file_path, "wb") as buffer:
+        buffer.write(content)
+    
+    # Create chat message with image
+    message_id = str(uuid.uuid4())
+    image_url = f"/api/uploads/chat/{filename}"
+    message_doc = {
+        "id": message_id,
+        "user_id": user["id"],
+        "username": user["username"],
+        "role": user["role"],
+        "content": "",
+        "image_url": image_url,
+        "is_ai": False,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.chat_messages.insert_one(message_doc)
+    return ChatResponse(**message_doc, image_url=image_url)
+
+# ==================== REPORT WITH FILE UPLOAD ====================
+
+@api_router.post("/reports/with-file")
+async def create_report_with_file(
+    title: str,
+    description: str,
+    target_url: str,
+    category: str,
+    file: UploadFile = File(None),
+    user: dict = Depends(get_current_user)
+):
+    file_url = None
+    file_name = None
+    
+    if file:
+        # Generate unique filename
+        file_id = str(uuid.uuid4())
+        file_extension = Path(file.filename).suffix if file.filename else ""
+        filename = f"{file_id}{file_extension}"
+        file_path = REPORTS_UPLOAD_DIR / filename
+        
+        # Save file
+        content = await file.read()
+        with open(file_path, "wb") as buffer:
+            buffer.write(content)
+        
+        file_url = f"/api/uploads/reports/{filename}"
+        file_name = file.filename
+    
+    report_id = str(uuid.uuid4())
+    report_doc = {
+        "id": report_id,
+        "title": title,
+        "description": description,
+        "target_url": target_url,
+        "category": category,
+        "status": ReportStatus.PENDING,
+        "submitted_by": user["id"],
+        "submitted_username": user["username"],
+        "reviewed_by": None,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "reviewed_at": None,
+        "evidence": None,
+        "file_url": file_url,
+        "file_name": file_name
+    }
+    
+    await db.reports.insert_one(report_doc)
+    
+    await db.users.update_one(
+        {"id": user["id"]},
+        {"$inc": {"reports_submitted": 1, "rank_points": 10}}
+    )
+    
+    return ReportResponse(**report_doc)
+
+# ==================== NOTIFICATIONS ====================
+
+@api_router.get("/notifications")
+async def get_notifications(user: dict = Depends(get_current_user)):
+    notifications = await db.notifications.find(
+        {"user_id": user["id"]},
+        {"_id": 0}
+    ).sort("created_at", -1).limit(20).to_list(20)
+    return notifications
+
+@api_router.post("/notifications/mark-read/{notification_id}")
+async def mark_notification_read(notification_id: str, user: dict = Depends(get_current_user)):
+    await db.notifications.update_one(
+        {"id": notification_id, "user_id": user["id"]},
+        {"$set": {"read": True}}
+    )
+    return {"message": "Notification marked as read"}
+
+@api_router.post("/notifications/mark-all-read")
+async def mark_all_notifications_read(user: dict = Depends(get_current_user)):
+    await db.notifications.update_many(
+        {"user_id": user["id"]},
+        {"$set": {"read": True}}
+    )
+    return {"message": "All notifications marked as read"}
+
+async def create_notification(user_id: str, title: str, message: str, notification_type: str = "info"):
+    notification_doc = {
+        "id": str(uuid.uuid4()),
+        "user_id": user_id,
+        "title": title,
+        "message": message,
+        "type": notification_type,
+        "read": False,
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.notifications.insert_one(notification_doc)
+
+async def check_and_award_badges(user_id: str):
+    user = await db.users.find_one({"id": user_id}, {"_id": 0})
+    if not user:
+        return
+    
+    earned_badges = []
+    
+    for badge in BADGES:
+        already_has = await db.user_badges.find_one({"user_id": user_id, "badge_id": badge["id"]})
+        if already_has:
+            continue
+            
+        earned = False
+        if badge["requirement_type"] == "missions" and user.get("missions_completed", 0) >= badge["requirement_value"]:
+            earned = True
+        elif badge["requirement_type"] == "reports" and user.get("reports_submitted", 0) >= badge["requirement_value"]:
+            earned = True
+        elif badge["requirement_type"] == "points" and user.get("rank_points", 0) >= badge["requirement_value"]:
+            earned = True
+        
+        if earned:
+            await db.user_badges.insert_one({
+                "id": str(uuid.uuid4()),
+                "user_id": user_id,
+                "badge_id": badge["id"],
+                "earned_at": datetime.now(timezone.utc).isoformat()
+            })
+            earned_badges.append(badge)
+            await create_notification(
+                user_id,
+                "🏆 Nova Conquista!",
+                f"Você desbloqueou o badge '{badge['name']}': {badge['description']}",
+                "badge"
+            )
+    
+    return earned_badges
+
+# ==================== SERVE UPLOADED FILES ====================
+
+@api_router.get("/uploads/chat/{filename}")
+async def serve_chat_file(filename: str):
+    file_path = CHAT_UPLOAD_DIR / filename
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+    return FileResponse(path=file_path)
+
+@api_router.get("/uploads/reports/{filename}")
+async def serve_report_file(filename: str):
+    file_path = REPORTS_UPLOAD_DIR / filename
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+    return FileResponse(path=file_path)
 
 # Include router
 app.include_router(api_router)
