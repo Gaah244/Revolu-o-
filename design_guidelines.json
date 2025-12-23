@@ -1,0 +1,160 @@
+{
+  "typography": {
+    "headings": {
+      "font_family": "Rajdhani, sans-serif",
+      "weights": ["500", "600", "700"],
+      "usage": "All page titles, section headers, and major stats. Use uppercase for H1/H2.",
+      "letter_spacing": "tracking-wide"
+    },
+    "body": {
+      "font_family": "JetBrains Mono, monospace",
+      "weights": ["400", "500"],
+      "usage": "All paragraph text, data tables, inputs, and chat messages.",
+      "letter_spacing": "tracking-normal"
+    },
+    "google_fonts_import": "https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Rajdhani:wght@500;600;700&display=swap"
+  },
+  "colors": {
+    "palette": {
+      "background": {
+        "default": "#030303",
+        "surface": "#0A0A0A",
+        "overlay": "rgba(3, 3, 3, 0.8)"
+      },
+      "primary": {
+        "default": "#00FF94",
+        "foreground": "#000000",
+        "glow": "0 0 10px rgba(0, 255, 148, 0.5)"
+      },
+      "secondary": {
+        "default": "#00E5FF",
+        "foreground": "#000000"
+      },
+      "accent": {
+        "default": "#D000FF",
+        "foreground": "#FFFFFF"
+      },
+      "destructive": {
+        "default": "#FF003C",
+        "foreground": "#FFFFFF",
+        "glow": "0 0 10px rgba(255, 0, 60, 0.5)"
+      },
+      "muted": {
+        "default": "#1A1A1A",
+        "foreground": "#808080"
+      },
+      "border": {
+        "default": "#333333",
+        "active": "#00FF94"
+      }
+    },
+    "usage_rules": [
+      "NEVER use gradients for backgrounds. Use solid #030303.",
+      "Use 'primary' (Neon Green) for 'System Online', 'Success', and main CTAs.",
+      "Use 'destructive' (Red) for 'System Offline', 'Threat', and 'Delete'.",
+      "Use 'secondary' (Cyan) for AI Chat and Information.",
+      "Use 'accent' (Purple) for Admin/Elite level indicators."
+    ]
+  },
+  "visual_enhancers": {
+    "scanlines": {
+      "css": "background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.2)); background-size: 100% 4px; pointer-events: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 50; opacity: 0.15;"
+    },
+    "glassmorphism": {
+      "panel": "bg-black/60 backdrop-blur-md border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.5)]"
+    },
+    "borders": {
+      "tech": "border border-white/10 hover:border-primary/50 transition-colors duration-300"
+    },
+    "glow": {
+      "text": "text-shadow: 0 0 5px currentColor;",
+      "box": "box-shadow: 0 0 15px rgba(0, 255, 148, 0.15);"
+    }
+  },
+  "components": {
+    "buttons": {
+      "style": "sharp-edges",
+      "classes": "rounded-none border border-primary/50 bg-primary/10 text-primary hover:bg-primary hover:text-black uppercase tracking-widest font-bold transition-all duration-200 shadow-[0_0_10px_rgba(0,255,148,0.2)] hover:shadow-[0_0_20px_rgba(0,255,148,0.6)]"
+    },
+    "cards": {
+      "style": "hud-panel",
+      "classes": "bg-black/40 border border-white/10 backdrop-blur-sm p-6 relative overflow-hidden group hover:border-primary/30 transition-all"
+    },
+    "inputs": {
+      "style": "terminal",
+      "classes": "bg-black border border-white/20 rounded-none focus:border-primary focus:ring-1 focus:ring-primary text-primary font-mono placeholder:text-gray-700"
+    },
+    "status_indicator": {
+      "online": "w-3 h-3 rounded-full bg-primary shadow-[0_0_8px_#00FF94] animate-pulse",
+      "offline": "w-3 h-3 rounded-full bg-destructive shadow-[0_0_8px_#FF003C]"
+    }
+  },
+  "layout": {
+    "grid_system": "The 'Control Room' Grid",
+    "spacing": "Compact but breathable. Use p-4 for panels, gap-4 for grids.",
+    "container": "max-w-[1600px] mx-auto p-6",
+    "z_index": {
+      "scanlines": 50,
+      "modal": 40,
+      "header": 30,
+      "content": 10,
+      "background": 0
+    }
+  },
+  "motion": {
+    "transitions": "transition-all duration-200 ease-out",
+    "animations": {
+      "glitch": "Use a CSS keyframe animation for 'glitch' effect on hover for titles.",
+      "scan": "A vertical line moving down for 'scanning' tools.",
+      "blink": "Cursor blinking in terminal inputs."
+    }
+  },
+  "accessibility": {
+    "contrast": "Ensure neon text is readable against black. Use 'font-medium' or 'font-bold' for colored text.",
+    "reduced_motion": "Disable scanlines and glitch effects if 'prefers-reduced-motion' is true."
+  },
+  "media": {
+    "icons": "Lucide React (default). Use 'Shield', 'Terminal', 'Activity', 'Lock', 'Globe', 'Cpu' heavily.",
+    "image_style": "Desaturated, high contrast, or tinted with green/cyan overlay."
+  },
+  "image_urls": {
+    "hero_background": {
+      "url": "https://images.pexels.com/photos/3825302/pexels-photo-3825302.jpeg",
+      "description": "Dark server room with blue/green lights. Use as background for Login or Hero with heavy overlay.",
+      "category": "background"
+    },
+    "cyber_texture": {
+      "url": "https://images.pexels.com/photos/1254111/pexels-photo-1254111.jpeg",
+      "description": "Abstract code/matrix texture. Use for 'About' or 'Mission' headers.",
+      "category": "texture"
+    }
+  },
+  "instructions_to_main_agent": [
+    "1. INSTALL FONTS: Add the Google Fonts import to 'index.css' immediately.",
+    "2. GLOBAL CSS: Add the 'scanlines' class to 'index.css' and apply it to the <body> tag.",
+    "3. TAILWIND: Update 'tailwind.config.js' with the custom colors (primary: #00FF94, etc) and font families.",
+    "4. SHADCN: When using Shadcn components, STRIP the 'rounded-md' classes. We want SHARP edges (rounded-none) for that Cyberpunk look.",
+    "5. LAYOUT: The Dashboard should feel like a HUD. Use borders to separate sections, not just whitespace.",
+    "6. CHAT: The AI Chat should look like a terminal window. Green text on black background.",
+    "7. MISSIONS: Use the 'status_indicator' styles for the 200/404 checks.",
+    "8. DATA-TESTID: Add 'data-testid' to ALL interactive elements (buttons, inputs, mission items)."
+  ],
+  "UNIVERSAL_GUIDELINES_FOR_MAIN_AGENT": [
+    "Dark colors look good when used independently without gradients. DO NOT use dark colors as gradients",
+    "Don't make generic centered layouts, simplistic gradients, and uniform styling.",
+    "Create depth through layered design elements with z-index hierarchy",
+    "Use glass-morphism effects with backdrop filters (12-24px blur)",
+    "You MUST NOT apply universal transition. Eg: 'transition: all'. This results in breaking transforms. Always add transitions for specific interactive elements like button, input excluding transforms",
+    "You MUST NOT center align the app container, ie do not add '.App { text-align: center; }' in the css file. This disrupts the human natural reading flow of text",
+    "Always use modern button styles like pill-shaped, or sharp button with interaction animations & color relevant to the app style",
+    "NEVER: use AI assistant Emoji characters like 🤖🧠 etc for icons.",
+    "Every interaction needs micro-animations - hover states, transitions, parallax effects, and entrance animations. Static = dead.",
+    "Use 2-3x more spacing than feels comfortable. Cramped designs look cheap.",
+    "Subtle grain textures, noise overlays, custom cursors, selection states, and loading animations: separates good from extraordinary.",
+    "Main agent relies on these image URLs. Missing categories = main agent will use placeholder text which is FORBIDDEN",
+    "Prioritize using pre-existing components from src/components/ui when applicable",
+    "Components MUST use named exports (export const ComponentName = ...)",
+    "Pages MUST use default exports (export default function PageName() {...})",
+    "Use 'sonner' for toasts"
+  ]
+}
