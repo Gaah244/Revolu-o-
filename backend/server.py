@@ -526,6 +526,9 @@ async def create_report(report_data: ReportCreate, user: dict = Depends(get_curr
         {"$inc": {"reports_submitted": 1, "rank_points": 10}}
     )
     
+    # Check and award badges
+    await check_and_award_badges(user["id"])
+    
     return ReportResponse(**report_doc)
 
 @api_router.get("/reports", response_model=List[ReportResponse])
