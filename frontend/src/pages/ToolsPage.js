@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
 import { api } from "../lib/api";
 import { toast } from "sonner";
@@ -9,7 +9,6 @@ import {
   FileCode,
   Download,
   Trash2,
-  Filter,
   ExternalLink,
   Shield,
   Bug,
@@ -17,6 +16,8 @@ import {
   Eye,
   Code,
   Terminal,
+  Upload,
+  File,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -36,7 +37,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "../components/ui/dialog";
-import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
+import { Card, CardContent } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 
@@ -50,7 +51,7 @@ const toolCategories = [
   { value: "outros", label: "Outros", icon: Terminal, color: "text-muted-foreground" },
 ];
 
-const ToolCard = ({ tool, onDelete, isAdmin }) => {
+const ToolCard = ({ tool, onDelete, onDownload, isAdmin }) => {
   const category = toolCategories.find((c) => c.value === tool.category);
   const Icon = category?.icon || Wrench;
 
@@ -69,6 +70,7 @@ const ToolCard = ({ tool, onDelete, isAdmin }) => {
                 </h3>
                 {tool.is_file && (
                   <Badge variant="outline" className="text-xs border-accent text-accent">
+                    <File className="w-3 h-3 mr-1" />
                     ARQUIVO
                   </Badge>
                 )}
@@ -83,6 +85,11 @@ const ToolCard = ({ tool, onDelete, isAdmin }) => {
                 <span className="text-xs text-muted-foreground">
                   {new Date(tool.created_at).toLocaleDateString("pt-BR")}
                 </span>
+                {tool.file_name && (
+                  <span className="text-xs text-muted-foreground">
+                    • {tool.file_name}
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -94,12 +101,17 @@ const ToolCard = ({ tool, onDelete, isAdmin }) => {
                 target="_blank"
                 rel="noopener noreferrer"
                 className="p-2 bg-white/5 border border-white/10 hover:border-primary/50 hover:text-primary transition-all"
+                title="Abrir Link"
               >
                 <ExternalLink className="w-4 h-4" />
               </a>
             )}
             {tool.is_file && (
-              <button className="p-2 bg-white/5 border border-white/10 hover:border-secondary/50 hover:text-secondary transition-all">
+              <button
+                onClick={() => onDownload(tool.id, tool.file_name)}
+                className="p-2 bg-white/5 border border-white/10 hover:border-secondary/50 hover:text-secondary transition-all"
+                title="Download"
+              >
                 <Download className="w-4 h-4" />
               </button>
             )}
@@ -108,6 +120,7 @@ const ToolCard = ({ tool, onDelete, isAdmin }) => {
                 data-testid={`delete-tool-${tool.id}`}
                 onClick={() => onDelete(tool.id)}
                 className="p-2 bg-white/5 border border-white/10 hover:border-destructive/50 hover:text-destructive transition-all"
+                title="Excluir"
               >
                 <Trash2 className="w-4 h-4" />
               </button>
@@ -120,12 +133,14 @@ const ToolCard = ({ tool, onDelete, isAdmin }) => {
 };
 
 export default function ToolsPage() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, user } = useAuth();
   const [tools, setTools] = useState([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [categoryFilter, setCategoryFilter] = useState("");
-  const [isFileUpload, setIsFileUpload] = useState(false);
+  const [uploadMode, setUploadMode] = useState("link");
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef(null);
+  const [selectedFile, setSelectedFile] = useState(null);
   const [formData, setFormData] = useState({
     name: "",
     description: "",
@@ -133,11 +148,12 @@ export default function ToolsPage() {
     url: "",
   });
 
+  // Admin and Tenente can add tools
+  const canAddTools = user?.role === "admin" || user?.role === "tenente";
+
   const fetchTools = async () => {
     try {
-      const params = {};
-      if (categoryFilter) params.category = categoryFilter;
-      const response = await api.getTools(params);
+      const response = await api.getTools();
       setTools(response.data);
     } catch (error) {
       console.error("Error fetching tools:", error);
@@ -148,7 +164,7 @@ export default function ToolsPage() {
 
   useEffect(() => {
     fetchTools();
-  }, [categoryFilter]);
+  }, []);
 
   const handleCreateTool = async (e) => {
     e.preventDefault();
@@ -159,15 +175,50 @@ export default function ToolsPage() {
       });
       toast.success("Ferramenta adicionada com sucesso!");
       setDialogOpen(false);
-      setFormData({
-        name: "",
-        description: "",
-        category: "",
-        url: "",
-      });
+      resetForm();
       fetchTools();
     } catch (error) {
       toast.error(error.response?.data?.detail || "Erro ao adicionar ferramenta");
+    }
+  };
+
+  const handleUploadTool = async (e) => {
+    e.preventDefault();
+    if (!selectedFile) {
+      toast.error("Selecione um arquivo");
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const formDataUpload = new FormData();
+      formDataUpload.append("file", selectedFile);
+      formDataUpload.append("name", formData.name);
+      formDataUpload.append("description", formData.description);
+      formDataUpload.append("category", formData.category);
+
+      await api.uploadTool(formDataUpload);
+      toast.success("Ferramenta enviada com sucesso!");
+      setDialogOpen(false);
+      resetForm();
+      fetchTools();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Erro ao enviar ferramenta");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const resetForm = () => {
+    setFormData({
+      name: "",
+      description: "",
+      category: "",
+      url: "",
+    });
+    setSelectedFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
     }
   };
 
@@ -180,6 +231,34 @@ export default function ToolsPage() {
       fetchTools();
     } catch (error) {
       toast.error(error.response?.data?.detail || "Erro ao excluir ferramenta");
+    }
+  };
+
+  const handleDownloadTool = async (toolId, fileName) => {
+    try {
+      const response = await api.downloadTool(toolId);
+      const blob = new Blob([response.data]);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName || "download";
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast.success("Download iniciado!");
+    } catch (error) {
+      toast.error("Erro ao baixar arquivo");
+    }
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setSelectedFile(file);
+      if (!formData.name) {
+        setFormData(prev => ({ ...prev, name: file.name.split('.')[0] }));
+      }
     }
   };
 
@@ -212,8 +291,8 @@ export default function ToolsPage() {
           </p>
         </div>
 
-        {isAdmin && (
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        {canAddTools && (
+          <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
             <DialogTrigger asChild>
               <Button data-testid="add-tool-btn" className="btn-cyber rounded-none">
                 <Plus className="w-4 h-4 mr-2" />
@@ -227,7 +306,7 @@ export default function ToolsPage() {
                 </DialogTitle>
               </DialogHeader>
 
-              <Tabs defaultValue="link" className="mt-4">
+              <Tabs value={uploadMode} onValueChange={setUploadMode} className="mt-4">
                 <TabsList className="grid w-full grid-cols-2 bg-white/5">
                   <TabsTrigger
                     value="link"
@@ -239,9 +318,8 @@ export default function ToolsPage() {
                   <TabsTrigger
                     value="upload"
                     className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary"
-                    disabled
                   >
-                    <FileCode className="w-4 h-4 mr-2" />
+                    <Upload className="w-4 h-4 mr-2" />
                     Upload
                   </TabsTrigger>
                 </TabsList>
@@ -330,6 +408,101 @@ export default function ToolsPage() {
                     </Button>
                   </form>
                 </TabsContent>
+
+                <TabsContent value="upload" className="mt-4">
+                  <form onSubmit={handleUploadTool} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label className="text-xs tracking-wider text-muted-foreground">
+                        ARQUIVO
+                      </Label>
+                      <div
+                        className="border-2 border-dashed border-white/20 p-6 text-center cursor-pointer hover:border-primary/50 transition-colors"
+                        onClick={() => fileInputRef.current?.click()}
+                      >
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          className="hidden"
+                          onChange={handleFileChange}
+                        />
+                        {selectedFile ? (
+                          <div className="flex items-center justify-center gap-2 text-primary">
+                            <FileCode className="w-6 h-6" />
+                            <span>{selectedFile.name}</span>
+                          </div>
+                        ) : (
+                          <div className="text-muted-foreground">
+                            <Upload className="w-8 h-8 mx-auto mb-2" />
+                            <p>Clique para selecionar um arquivo</p>
+                            <p className="text-xs mt-1">ou arraste e solte aqui</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-xs tracking-wider text-muted-foreground">
+                        NOME
+                      </Label>
+                      <Input
+                        value={formData.name}
+                        onChange={(e) =>
+                          setFormData({ ...formData, name: e.target.value })
+                        }
+                        className="input-terminal rounded-none"
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-xs tracking-wider text-muted-foreground">
+                        CATEGORIA
+                      </Label>
+                      <Select
+                        value={formData.category}
+                        onValueChange={(value) =>
+                          setFormData({ ...formData, category: value })
+                        }
+                      >
+                        <SelectTrigger className="input-terminal rounded-none">
+                          <SelectValue placeholder="Selecione" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-cyber-surface border-white/10">
+                          {toolCategories.map((cat) => (
+                            <SelectItem key={cat.value} value={cat.value}>
+                              <span className="flex items-center gap-2">
+                                <cat.icon className={`w-4 h-4 ${cat.color}`} />
+                                {cat.label}
+                              </span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label className="text-xs tracking-wider text-muted-foreground">
+                        DESCRIÇÃO
+                      </Label>
+                      <Textarea
+                        value={formData.description}
+                        onChange={(e) =>
+                          setFormData({ ...formData, description: e.target.value })
+                        }
+                        className="input-terminal rounded-none min-h-[80px]"
+                        required
+                      />
+                    </div>
+
+                    <Button
+                      type="submit"
+                      className="w-full btn-cyber rounded-none"
+                      disabled={!selectedFile || uploading}
+                    >
+                      {uploading ? "ENVIANDO..." : "ENVIAR FERRAMENTA"}
+                    </Button>
+                  </form>
+                </TabsContent>
               </Tabs>
             </DialogContent>
           </Dialog>
@@ -364,7 +537,8 @@ export default function ToolsPage() {
                 key={tool.id}
                 tool={tool}
                 onDelete={handleDeleteTool}
-                isAdmin={isAdmin}
+                onDownload={handleDownloadTool}
+                isAdmin={canAddTools}
               />
             ))
           ) : (
@@ -385,7 +559,8 @@ export default function ToolsPage() {
                   key={tool.id}
                   tool={tool}
                   onDelete={handleDeleteTool}
-                  isAdmin={isAdmin}
+                  onDownload={handleDownloadTool}
+                  isAdmin={canAddTools}
                 />
               ))
             ) : (
