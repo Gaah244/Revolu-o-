@@ -23,7 +23,7 @@ const navItems = [
   { path: "/reports", label: "Denúncias", icon: AlertTriangle, roles: "all" },
   { path: "/chat", label: "Chat", icon: MessageSquare, roles: "all" },
   { path: "/tools", label: "Ferramentas", icon: Wrench, roles: ["admin", "tenente", "elite", "soldado"] },
-  { path: "/admin", label: "Admin", icon: Shield, roles: ["admin"] },
+  { path: "/admin", label: "Admin", icon: Shield, roles: ["admin", "tenente"] },
   { path: "/profile", label: "Perfil", icon: User, roles: "all" },
 ];
 
