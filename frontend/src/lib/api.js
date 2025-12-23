@@ -79,6 +79,32 @@ export const api = {
     axios.post(`${API}/chat/send`, { content }, { headers: getAuthHeaders() }),
   sendAiMessage: (content) =>
     axios.post(`${API}/chat/ai`, { content }, { headers: getAuthHeaders() }),
+  uploadChatImage: (formData) =>
+    axios.post(`${API}/chat/upload-image`, formData, {
+      headers: { ...getAuthHeaders(), "Content-Type": "multipart/form-data" },
+    }),
+
+  // Reports
+  getReports: (params = {}) =>
+    axios.get(`${API}/reports`, { headers: getAuthHeaders(), params }),
+  createReport: (data) =>
+    axios.post(`${API}/reports`, data, { headers: getAuthHeaders() }),
+  createReportWithFile: (formData) =>
+    axios.post(`${API}/reports/with-file`, formData, {
+      headers: { ...getAuthHeaders(), "Content-Type": "multipart/form-data" },
+    }),
+  acceptReport: (reportId) =>
+    axios.post(`${API}/reports/${reportId}/accept`, {}, { headers: getAuthHeaders() }),
+  rejectReport: (reportId) =>
+    axios.post(`${API}/reports/${reportId}/reject`, {}, { headers: getAuthHeaders() }),
+
+  // Notifications
+  getNotifications: () =>
+    axios.get(`${API}/notifications`, { headers: getAuthHeaders() }),
+  markNotificationRead: (notificationId) =>
+    axios.post(`${API}/notifications/mark-read/${notificationId}`, {}, { headers: getAuthHeaders() }),
+  markAllNotificationsRead: () =>
+    axios.post(`${API}/notifications/mark-all-read`, {}, { headers: getAuthHeaders() }),
 
   // Stats
   getStats: () =>
