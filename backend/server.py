@@ -682,6 +682,8 @@ async def get_chat_messages(limit: int = 50, user: dict = Depends(get_current_us
     for m in messages:
         if "role" not in m:
             m["role"] = "externo"
+        if "image_url" not in m:
+            m["image_url"] = None
     return [ChatResponse(**m) for m in messages]
 
 @api_router.post("/chat/send", response_model=ChatResponse)
