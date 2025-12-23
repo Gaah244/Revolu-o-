@@ -171,9 +171,19 @@ class ChatResponse(BaseModel):
     id: str
     user_id: str
     username: str
+    role: str = "externo"
     content: str
     is_ai: bool
     created_at: str
+
+# Badge Models
+class BadgeResponse(BaseModel):
+    id: str
+    name: str
+    description: str
+    icon: str
+    requirement_type: str
+    requirement_value: int
 
 # ==================== AUTH HELPERS ====================
 
