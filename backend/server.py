@@ -799,6 +799,106 @@ async def get_category_stats(user: dict = Depends(get_current_user)):
         "reports_by_category": {item["_id"]: item["count"] for item in report_stats}
     }
 
+# ==================== BADGES ROUTES ====================
+
+BADGES = [
+    {"id": "first_mission", "name": "Primeira Missão", "description": "Completou sua primeira missão", "icon": "target", "requirement_type": "missions", "requirement_value": 1},
+    {"id": "hunter_10", "name": "Caçador", "description": "Completou 10 missões", "icon": "crosshair", "requirement_type": "missions", "requirement_value": 10},
+    {"id": "hunter_50", "name": "Caçador Elite", "description": "Completou 50 missões", "icon": "award", "requirement_type": "missions", "requirement_value": 50},
+    {"id": "hunter_100", "name": "Lenda", "description": "Completou 100 missões", "icon": "crown", "requirement_type": "missions", "requirement_value": 100},
+    {"id": "reporter_5", "name": "Informante", "description": "Enviou 5 denúncias", "icon": "alert-triangle", "requirement_type": "reports", "requirement_value": 5},
+    {"id": "reporter_25", "name": "Vigilante", "description": "Enviou 25 denúncias", "icon": "eye", "requirement_type": "reports", "requirement_value": 25},
+    {"id": "points_500", "name": "Operador", "description": "Alcançou 500 pontos", "icon": "zap", "requirement_type": "points", "requirement_value": 500},
+    {"id": "points_2500", "name": "Veterano", "description": "Alcançou 2500 pontos", "icon": "shield", "requirement_type": "points", "requirement_value": 2500},
+    {"id": "points_5000", "name": "Mestre", "description": "Alcançou 5000 pontos", "icon": "star", "requirement_type": "points", "requirement_value": 5000},
+]
+
+@api_router.get("/badges")
+async def get_all_badges(user: dict = Depends(get_current_user)):
+    return BADGES
+
+@api_router.get("/badges/user/{user_id}")
+async def get_user_badges(user_id: str, user: dict = Depends(get_current_user)):
+    target_user = await db.users.find_one({"id": user_id}, {"_id": 0})
+    if not target_user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    earned_badges = []
+    for badge in BADGES:
+        if badge["requirement_type"] == "missions" and target_user.get("missions_completed", 0) >= badge["requirement_value"]:
+            earned_badges.append(badge)
+        elif badge["requirement_type"] == "reports" and target_user.get("reports_submitted", 0) >= badge["requirement_value"]:
+            earned_badges.append(badge)
+        elif badge["requirement_type"] == "points" and target_user.get("rank_points", 0) >= badge["requirement_value"]:
+            earned_badges.append(badge)
+    
+    return earned_badges
+
+# ==================== FILE UPLOAD FOR TOOLS ====================
+from fastapi.responses import FileResponse
+import shutil
+
+UPLOAD_DIR = ROOT_DIR / "uploads" / "tools"
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+
+@api_router.post("/tools/upload")
+async def upload_tool_file(
+    name: str,
+    description: str,
+    category: str,
+    file: UploadFile = File(...),
+    user: dict = Depends(require_roles([UserRole.ADMIN]))
+):
+    # Generate unique filename
+    file_id = str(uuid.uuid4())
+    file_extension = Path(file.filename).suffix if file.filename else ""
+    filename = f"{file_id}{file_extension}"
+    file_path = UPLOAD_DIR / filename
+    
+    # Save file
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
+    
+    # Create tool entry
+    tool_id = str(uuid.uuid4())
+    tool_doc = {
+        "id": tool_id,
+        "name": name,
+        "description": description,
+        "category": category,
+        "url": None,
+        "file_path": str(file_path),
+        "file_name": file.filename,
+        "is_file": True,
+        "created_by": user["id"],
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    
+    await db.tools.insert_one(tool_doc)
+    return {"id": tool_id, "message": "Tool uploaded successfully", "filename": file.filename}
+
+@api_router.get("/tools/download/{tool_id}")
+async def download_tool(tool_id: str, user: dict = Depends(get_current_user)):
+    if user["role"] == UserRole.EXTERNO:
+        raise HTTPException(status_code=403, detail="External users cannot download tools")
+    
+    tool = await db.tools.find_one({"id": tool_id}, {"_id": 0})
+    if not tool:
+        raise HTTPException(status_code=404, detail="Tool not found")
+    
+    if not tool.get("is_file") or not tool.get("file_path"):
+        raise HTTPException(status_code=400, detail="Tool has no file")
+    
+    file_path = Path(tool["file_path"])
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    return FileResponse(
+        path=file_path,
+        filename=tool.get("file_name", file_path.name),
+        media_type="application/octet-stream"
+    )
+
 # Include router
 app.include_router(api_router)
 
