@@ -677,6 +677,10 @@ async def delete_tool(tool_id: str, user: dict = Depends(require_roles([UserRole
 async def get_chat_messages(limit: int = 50, user: dict = Depends(get_current_user)):
     messages = await db.chat_messages.find({}, {"_id": 0}).sort("created_at", -1).limit(limit).to_list(limit)
     messages.reverse()
+    # Add default role for old messages without role
+    for m in messages:
+        if "role" not in m:
+            m["role"] = "externo"
     return [ChatResponse(**m) for m in messages]
 
 @api_router.post("/chat/send", response_model=ChatResponse)
@@ -686,6 +690,7 @@ async def send_chat_message(message: ChatMessage, user: dict = Depends(get_curre
         "id": message_id,
         "user_id": user["id"],
         "username": user["username"],
+        "role": user["role"],
         "content": message.content,
         "is_ai": False,
         "created_at": datetime.now(timezone.utc).isoformat()
@@ -703,6 +708,7 @@ async def chat_with_ai(message: ChatMessage, user: dict = Depends(get_current_us
         "id": user_message_id,
         "user_id": user["id"],
         "username": user["username"],
+        "role": user["role"],
         "content": message.content,
         "is_ai": False,
         "created_at": datetime.now(timezone.utc).isoformat()
@@ -732,6 +738,7 @@ async def chat_with_ai(message: ChatMessage, user: dict = Depends(get_current_us
             "id": ai_message_id,
             "user_id": "ai-assistant",
             "username": "ARIA",
+            "role": "ai",
             "content": ai_response,
             "is_ai": True,
             "created_at": datetime.now(timezone.utc).isoformat()
