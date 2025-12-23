@@ -215,7 +215,11 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 
 def require_roles(allowed_roles: List[str]):
     async def role_checker(user: dict = Depends(get_current_user)):
-        if user["role"] not in allowed_roles:
+        # Tenente tem mesmo acesso que admin
+        effective_roles = allowed_roles.copy()
+        if UserRole.ADMIN in effective_roles and UserRole.TENENTE not in effective_roles:
+            effective_roles.append(UserRole.TENENTE)
+        if user["role"] not in effective_roles:
             raise HTTPException(status_code=403, detail="Insufficient permissions")
         return user
     return role_checker
