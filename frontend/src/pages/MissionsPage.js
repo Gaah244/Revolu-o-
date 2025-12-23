@@ -283,25 +283,25 @@ export default function MissionsPage() {
 
         <div className="flex items-center gap-3">
           {/* Filters */}
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <Select value={statusFilter} onValueChange={(val) => setStatusFilter(val === "all" ? "" : val)}>
             <SelectTrigger data-testid="status-filter" className="w-[140px] input-terminal rounded-none">
               <Filter className="w-4 h-4 mr-2" />
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent className="bg-cyber-surface border-white/10">
-              <SelectItem value="">Todos</SelectItem>
+              <SelectItem value="all">Todos</SelectItem>
               <SelectItem value="pending">Pendente</SelectItem>
               <SelectItem value="in_progress">Em Progresso</SelectItem>
               <SelectItem value="completed">Concluída</SelectItem>
             </SelectContent>
           </Select>
 
-          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+          <Select value={categoryFilter} onValueChange={(val) => setCategoryFilter(val === "all" ? "" : val)}>
             <SelectTrigger data-testid="category-filter" className="w-[140px] input-terminal rounded-none">
               <SelectValue placeholder="Categoria" />
             </SelectTrigger>
             <SelectContent className="bg-cyber-surface border-white/10">
-              <SelectItem value="">Todas</SelectItem>
+              <SelectItem value="all">Todas</SelectItem>
               {categories.map((cat) => (
                 <SelectItem key={cat.value} value={cat.value}>
                   {cat.label}

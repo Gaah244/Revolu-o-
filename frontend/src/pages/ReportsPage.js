@@ -239,13 +239,13 @@ export default function ReportsPage() {
 
         <div className="flex items-center gap-3">
           {/* Filter */}
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <Select value={statusFilter} onValueChange={(val) => setStatusFilter(val === "all" ? "" : val)}>
             <SelectTrigger data-testid="report-status-filter" className="w-[140px] input-terminal rounded-none">
               <Filter className="w-4 h-4 mr-2" />
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent className="bg-cyber-surface border-white/10">
-              <SelectItem value="">Todos</SelectItem>
+              <SelectItem value="all">Todos</SelectItem>
               <SelectItem value="pending">Pendente</SelectItem>
               <SelectItem value="accepted">Aceita</SelectItem>
               <SelectItem value="rejected">Rejeitada</SelectItem>
