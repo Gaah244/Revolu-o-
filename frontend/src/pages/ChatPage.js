@@ -12,6 +12,8 @@ import {
   Star,
   Sword,
   Users,
+  Image,
+  X,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -32,6 +34,7 @@ const ChatMessage = ({ message, isOwn }) => {
   const isAi = message.is_ai;
   const role = roleConfig[message.role] || roleConfig.externo;
   const RoleIcon = role.icon;
+  const API_BASE = process.env.REACT_APP_BACKEND_URL;
 
   return (
     <div
@@ -80,9 +83,19 @@ const ChatMessage = ({ message, isOwn }) => {
               : "bg-white/5 border border-white/10"
           }`}
         >
-          <p className="text-sm text-white whitespace-pre-wrap">
-            {message.content}
-          </p>
+          {message.image_url && (
+            <img 
+              src={`${API_BASE}${message.image_url}`}
+              alt="Imagem enviada"
+              className="max-w-full max-h-64 mb-2 border border-white/10 cursor-pointer hover:opacity-80 transition-opacity"
+              onClick={() => window.open(`${API_BASE}${message.image_url}`, '_blank')}
+            />
+          )}
+          {message.content && (
+            <p className="text-sm text-white whitespace-pre-wrap">
+              {message.content}
+            </p>
+          )}
         </div>
       </div>
     </div>
@@ -96,7 +109,10 @@ export default function ChatPage() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
   const scrollRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   const fetchMessages = async () => {
     try {
@@ -124,15 +140,45 @@ export default function ChatPage() {
     }
   }, [messages]);
 
+  const handleImageSelect = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (!file.type.startsWith('image/')) {
+        toast.error("Apenas imagens são permitidas");
+        return;
+      }
+      setSelectedImage(file);
+      setImagePreview(URL.createObjectURL(file));
+    }
+  };
+
+  const clearImage = () => {
+    setSelectedImage(null);
+    setImagePreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
   const handleSendMessage = async (e) => {
     e.preventDefault();
-    if (!newMessage.trim() || sending) return;
+    if ((!newMessage.trim() && !selectedImage) || sending) return;
 
     setSending(true);
     try {
-      const response = await api.sendMessage(newMessage);
-      setMessages((prev) => [...prev, response.data]);
+      if (selectedImage) {
+        const formData = new FormData();
+        formData.append("file", selectedImage);
+        await api.uploadChatImage(formData);
+        clearImage();
+      }
+      
+      if (newMessage.trim()) {
+        await api.sendMessage(newMessage);
+      }
+      
       setNewMessage("");
+      await fetchMessages();
     } catch (error) {
       toast.error("Erro ao enviar mensagem");
     } finally {
@@ -148,8 +194,7 @@ export default function ChatPage() {
     setNewMessage("");
 
     try {
-      const response = await api.sendAiMessage(question);
-      // Refresh messages to get both user message and AI response
+      await api.sendAiMessage(question);
       await fetchMessages();
     } catch (error) {
       toast.error("Erro ao obter resposta da IA");
@@ -178,11 +223,11 @@ export default function ChatPage() {
           CHAT DA EQUIPE
         </h1>
         <p className="text-muted-foreground text-sm mt-1">
-          Converse com a equipe e peça ajuda à IA
+          Converse com a equipe, envie provas e peça ajuda à IA
         </p>
       </div>
 
-      {/* Chat Container - Increased height */}
+      {/* Chat Container */}
       <Card className="hud-panel border-white/10 flex-1 flex flex-col overflow-hidden min-h-[500px]">
         <CardHeader className="border-b border-white/10 py-3 flex-shrink-0">
           <div className="flex items-center justify-between">
@@ -197,7 +242,7 @@ export default function ChatPage() {
           </div>
         </CardHeader>
 
-        {/* Messages - Larger area */}
+        {/* Messages */}
         <ScrollArea ref={scrollRef} className="flex-1 p-4 min-h-[400px]">
           <div className="space-y-4 pb-4">
             {messages.length > 0 ? (
@@ -239,9 +284,41 @@ export default function ChatPage() {
           </div>
         </ScrollArea>
 
+        {/* Image Preview */}
+        {imagePreview && (
+          <div className="px-4 py-2 border-t border-white/10 bg-white/5">
+            <div className="flex items-center gap-2">
+              <img src={imagePreview} alt="Preview" className="h-16 w-auto border border-white/20" />
+              <button
+                onClick={clearImage}
+                className="p-1 text-destructive hover:bg-destructive/20 transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+              <span className="text-xs text-muted-foreground">{selectedImage?.name}</span>
+            </div>
+          </div>
+        )}
+
         {/* Input */}
         <div className="p-4 border-t border-white/10 flex-shrink-0">
           <form onSubmit={handleSendMessage} className="flex gap-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleImageSelect}
+              className="hidden"
+            />
+            <Button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              variant="outline"
+              className="border-white/20 hover:border-primary/50 hover:text-primary rounded-none px-3 h-12"
+              title="Enviar imagem"
+            >
+              <Image className="w-5 h-5" />
+            </Button>
             <Input
               data-testid="chat-input"
               value={newMessage}
@@ -253,7 +330,7 @@ export default function ChatPage() {
             <Button
               type="submit"
               data-testid="send-message-btn"
-              disabled={!newMessage.trim() || sending || aiLoading}
+              disabled={(!newMessage.trim() && !selectedImage) || sending || aiLoading}
               className="btn-cyber rounded-none px-6 h-12"
             >
               <Send className="w-5 h-5" />
@@ -271,7 +348,7 @@ export default function ChatPage() {
             </Button>
           </form>
           <p className="text-xs text-muted-foreground mt-2">
-            Pressione Enter para enviar ou clique em "IA" para perguntar à ARIA
+            Clique no ícone de imagem para enviar provas • Pressione Enter para enviar
           </p>
         </div>
       </Card>
