@@ -1,18 +1,21 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { api } from "../lib/api";
+import { useNavigate } from "react-router-dom";
 import {
   Target,
   AlertTriangle,
-  Users,
   Trophy,
   Activity,
   Globe,
   TrendingUp,
   Shield,
+  MessageSquare,
+  Lock,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Progress } from "../components/ui/progress";
+import { Button } from "../components/ui/button";
 
 const StatCard = ({ title, value, subtitle, icon: Icon, color, glow }) => (
   <Card className="hud-panel border-white/10 hover:border-primary/30 transition-all">
@@ -72,8 +75,44 @@ const RankingItem = ({ user, rank, isCurrentUser }) => {
   );
 };
 
+// Restricted page for external users
+const ExternalUserView = ({ user, navigate }) => (
+  <div className="space-y-8 animate-fade-in" data-testid="dashboard-page">
+    <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
+      <div className="p-6 bg-white/5 border border-white/10 mb-6">
+        <Lock className="w-16 h-16 text-muted-foreground" />
+      </div>
+      <h1 className="font-display text-3xl font-bold text-white tracking-wider mb-4">
+        ACESSO RESTRITO
+      </h1>
+      <p className="text-muted-foreground max-w-md mb-8">
+        Como usuário externo, você tem acesso apenas às funcionalidades de denúncia e chat.
+        O dashboard completo é exclusivo para membros internos da The Admins.
+      </p>
+      <div className="flex gap-4">
+        <Button
+          onClick={() => navigate("/reports")}
+          className="btn-cyber rounded-none"
+        >
+          <AlertTriangle className="w-4 h-4 mr-2" />
+          FAZER DENÚNCIA
+        </Button>
+        <Button
+          onClick={() => navigate("/chat")}
+          variant="outline"
+          className="border-secondary text-secondary hover:bg-secondary hover:text-black rounded-none"
+        >
+          <MessageSquare className="w-4 h-4 mr-2" />
+          ACESSAR CHAT
+        </Button>
+      </div>
+    </div>
+  </div>
+);
+
 export default function DashboardPage() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [stats, setStats] = useState(null);
   const [ranking, setRanking] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -105,6 +144,11 @@ export default function DashboardPage() {
         </div>
       </div>
     );
+  }
+
+  // Show restricted view for external users
+  if (user?.role === "externo") {
+    return <ExternalUserView user={user} navigate={navigate} />;
   }
 
   const completionRate = stats?.missions?.total
