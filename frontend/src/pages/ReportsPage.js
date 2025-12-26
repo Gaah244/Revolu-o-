@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
 import { api } from "../lib/api";
 import { toast } from "sonner";
@@ -11,6 +11,9 @@ import {
   X,
   ExternalLink,
   Filter,
+  Upload,
+  File,
+  Download,
 } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -34,16 +37,16 @@ import { Card, CardContent } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 
 const categories = [
-  { value: "golpe", label: "Golpe" },
-  { value: "fraude", label: "Fraude" },
-  { value: "phishing", label: "Phishing" },
-  { value: "malware", label: "Malware" },
-  { value: "grupo_whatsapp", label: "Grupo WhatsApp" },
-  { value: "conteudo_ilegal", label: "Conteúdo Ilegal" },
-  { value: "trojan", label: "Trojan" },
-  { value: "spyware", label: "Spyware" },
-  { value: "apk_malicioso", label: "APK Malicioso" },
-  { value: "outros", label: "Outros" },
+  { value: "golpe", label: "Golpe", requiresFile: false },
+  { value: "fraude", label: "Fraude", requiresFile: false },
+  { value: "phishing", label: "Phishing", requiresFile: false },
+  { value: "malware", label: "Malware", requiresFile: false },
+  { value: "grupo_whatsapp", label: "Grupo WhatsApp", requiresFile: false },
+  { value: "conteudo_ilegal", label: "Conteúdo Ilegal", requiresFile: false },
+  { value: "trojan", label: "Trojan", requiresFile: false },
+  { value: "spyware", label: "Spyware", requiresFile: false },
+  { value: "apk_malicioso", label: "APK Malicioso", requiresFile: true },
+  { value: "outros", label: "Outros", requiresFile: false },
 ];
 
 const statusConfig = {
@@ -53,6 +56,8 @@ const statusConfig = {
 };
 
 const ReportCard = ({ report, onAccept, onReject, canReview }) => {
+  const API_BASE = process.env.REACT_APP_BACKEND_URL;
+  
   return (
     <Card className="hud-panel border-white/10 hover:border-primary/30 transition-all animate-fade-in">
       <CardContent className="p-6">
@@ -68,6 +73,12 @@ const ReportCard = ({ report, onAccept, onReject, canReview }) => {
               <Badge variant="outline" className="category-badge border-white/20">
                 {categories.find((c) => c.value === report.category)?.label || report.category}
               </Badge>
+              {report.file_url && (
+                <Badge variant="outline" className="border-accent text-accent">
+                  <File className="w-3 h-3 mr-1" />
+                  ARQUIVO
+                </Badge>
+              )}
             </div>
 
             <h3 className="font-display text-lg font-bold text-white truncate">
@@ -109,6 +120,26 @@ const ReportCard = ({ report, onAccept, onReject, canReview }) => {
                 <p className="text-white">{report.evidence}</p>
               </div>
             )}
+
+            {report.file_url && (
+              <div className="mt-3 p-3 bg-accent/10 border border-accent/30 text-xs">
+                <p className="text-accent mb-1 flex items-center gap-1">
+                  <File className="w-4 h-4" />
+                  ARQUIVO ANEXADO:
+                </p>
+                <div className="flex items-center gap-2">
+                  <span className="text-white">{report.file_name}</span>
+                  <a
+                    href={`${API_BASE}${report.file_url}`}
+                    download={report.file_name}
+                    className="text-accent hover:underline flex items-center gap-1"
+                  >
+                    <Download className="w-3 h-3" />
+                    Baixar
+                  </a>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Actions */}
@@ -147,6 +178,9 @@ export default function ReportsPage() {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState("all");
+  const [submitting, setSubmitting] = useState(false);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const fileInputRef = useRef(null);
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -156,6 +190,8 @@ export default function ReportsPage() {
   });
 
   const canReview = ["admin", "tenente", "elite"].includes(user?.role);
+  const selectedCategory = categories.find(c => c.value === formData.category);
+  const requiresFile = selectedCategory?.requiresFile || false;
 
   const fetchReports = async () => {
     try {
@@ -174,22 +210,61 @@ export default function ReportsPage() {
     fetchReports();
   }, [statusFilter]);
 
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setSelectedFile(file);
+    }
+  };
+
+  const clearFile = () => {
+    setSelectedFile(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const resetForm = () => {
+    setFormData({
+      title: "",
+      description: "",
+      target_url: "",
+      category: "",
+      evidence: "",
+    });
+    clearFile();
+  };
+
   const handleCreateReport = async (e) => {
     e.preventDefault();
+    
+    if (requiresFile && !selectedFile) {
+      toast.error("Esta categoria requer o envio de um arquivo");
+      return;
+    }
+
+    setSubmitting(true);
     try {
-      await api.createReport(formData);
+      if (selectedFile) {
+        const formDataUpload = new FormData();
+        formDataUpload.append("file", selectedFile);
+        formDataUpload.append("title", formData.title);
+        formDataUpload.append("description", formData.description);
+        formDataUpload.append("target_url", formData.target_url || "N/A");
+        formDataUpload.append("category", formData.category);
+        await api.createReportWithFile(formDataUpload);
+      } else {
+        await api.createReport(formData);
+      }
+      
       toast.success("Denúncia enviada com sucesso! +10 pontos de ranking.");
       setDialogOpen(false);
-      setFormData({
-        title: "",
-        description: "",
-        target_url: "",
-        category: "",
-        evidence: "",
-      });
+      resetForm();
       fetchReports();
     } catch (error) {
       toast.error(error.response?.data?.detail || "Erro ao enviar denúncia");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -239,7 +314,7 @@ export default function ReportsPage() {
 
         <div className="flex items-center gap-3">
           {/* Filter */}
-          <Select value={statusFilter} onValueChange={(val) => setStatusFilter(val === "all" ? "" : val)}>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger data-testid="report-status-filter" className="w-[140px] input-terminal rounded-none">
               <Filter className="w-4 h-4 mr-2" />
               <SelectValue placeholder="Status" />
@@ -252,20 +327,60 @@ export default function ReportsPage() {
             </SelectContent>
           </Select>
 
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
             <DialogTrigger asChild>
               <Button data-testid="create-report-btn" className="btn-cyber rounded-none">
                 <Plus className="w-4 h-4 mr-2" />
                 NOVA DENÚNCIA
               </Button>
             </DialogTrigger>
-            <DialogContent className="bg-cyber-surface border-white/10 max-w-lg">
+            <DialogContent className="bg-cyber-surface border-white/10 max-w-lg max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle className="font-display text-xl tracking-wider text-cyber-orange">
                   CRIAR NOVA DENÚNCIA
                 </DialogTitle>
               </DialogHeader>
               <form onSubmit={handleCreateReport} className="space-y-4 mt-4">
+                <div className="space-y-2">
+                  <Label className="text-xs tracking-wider text-muted-foreground">
+                    CATEGORIA
+                  </Label>
+                  <Select
+                    value={formData.category}
+                    onValueChange={(value) => {
+                      setFormData({ ...formData, category: value });
+                      // Clear file if category doesn't require it
+                      const cat = categories.find(c => c.value === value);
+                      if (!cat?.requiresFile) {
+                        clearFile();
+                      }
+                    }}
+                  >
+                    <SelectTrigger data-testid="report-category-select" className="input-terminal rounded-none">
+                      <SelectValue placeholder="Selecione a categoria" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-cyber-surface border-white/10">
+                      {categories.map((cat) => (
+                        <SelectItem key={cat.value} value={cat.value}>
+                          <span className="flex items-center gap-2">
+                            {cat.label}
+                            {cat.requiresFile && (
+                              <Badge variant="outline" className="text-[10px] border-accent text-accent">
+                                ARQUIVO
+                              </Badge>
+                            )}
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {requiresFile && (
+                    <p className="text-xs text-accent">
+                      Esta categoria requer o envio do arquivo (APK) para análise
+                    </p>
+                  )}
+                </div>
+
                 <div className="space-y-2">
                   <Label className="text-xs tracking-wider text-muted-foreground">
                     TÍTULO
@@ -282,45 +397,72 @@ export default function ReportsPage() {
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label className="text-xs tracking-wider text-muted-foreground">
-                    URL DO ALVO
-                  </Label>
-                  <Input
-                    data-testid="report-url-input"
-                    type="url"
-                    value={formData.target_url}
-                    onChange={(e) =>
-                      setFormData({ ...formData, target_url: e.target.value })
-                    }
-                    className="input-terminal rounded-none"
-                    placeholder="https://..."
-                    required
-                  />
-                </div>
+                {!requiresFile && (
+                  <div className="space-y-2">
+                    <Label className="text-xs tracking-wider text-muted-foreground">
+                      URL DO ALVO
+                    </Label>
+                    <Input
+                      data-testid="report-url-input"
+                      type="url"
+                      value={formData.target_url}
+                      onChange={(e) =>
+                        setFormData({ ...formData, target_url: e.target.value })
+                      }
+                      className="input-terminal rounded-none"
+                      placeholder="https://..."
+                      required={!requiresFile}
+                    />
+                  </div>
+                )}
 
-                <div className="space-y-2">
-                  <Label className="text-xs tracking-wider text-muted-foreground">
-                    CATEGORIA
-                  </Label>
-                  <Select
-                    value={formData.category}
-                    onValueChange={(value) =>
-                      setFormData({ ...formData, category: value })
-                    }
-                  >
-                    <SelectTrigger data-testid="report-category-select" className="input-terminal rounded-none">
-                      <SelectValue placeholder="Selecione a categoria" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-cyber-surface border-white/10">
-                      {categories.map((cat) => (
-                        <SelectItem key={cat.value} value={cat.value}>
-                          {cat.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                {/* File Upload Section */}
+                {(requiresFile || formData.category) && (
+                  <div className="space-y-2">
+                    <Label className="text-xs tracking-wider text-muted-foreground">
+                      {requiresFile ? "ARQUIVO (OBRIGATÓRIO)" : "ARQUIVO DE PROVA (OPCIONAL)"}
+                    </Label>
+                    <div
+                      className={`border-2 border-dashed p-4 text-center cursor-pointer transition-colors ${
+                        requiresFile 
+                          ? "border-accent/50 hover:border-accent" 
+                          : "border-white/20 hover:border-primary/50"
+                      }`}
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        className="hidden"
+                        onChange={handleFileChange}
+                        accept={requiresFile ? ".apk,.zip,.rar" : "*"}
+                      />
+                      {selectedFile ? (
+                        <div className="flex items-center justify-center gap-2">
+                          <File className={`w-6 h-6 ${requiresFile ? "text-accent" : "text-primary"}`} />
+                          <span className="text-white">{selectedFile.name}</span>
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); clearFile(); }}
+                            className="p-1 text-destructive hover:bg-destructive/20"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="text-muted-foreground">
+                          <Upload className="w-8 h-8 mx-auto mb-2" />
+                          <p>Clique para selecionar um arquivo</p>
+                          {requiresFile && (
+                            <p className="text-xs text-accent mt-1">
+                              Formatos: APK, ZIP, RAR
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   <Label className="text-xs tracking-wider text-muted-foreground">
@@ -340,7 +482,7 @@ export default function ReportsPage() {
 
                 <div className="space-y-2">
                   <Label className="text-xs tracking-wider text-muted-foreground">
-                    EVIDÊNCIAS (OPCIONAL)
+                    EVIDÊNCIAS ADICIONAIS (OPCIONAL)
                   </Label>
                   <Textarea
                     data-testid="report-evidence-input"
@@ -357,8 +499,9 @@ export default function ReportsPage() {
                   type="submit"
                   data-testid="submit-report-btn"
                   className="w-full btn-cyber rounded-none"
+                  disabled={submitting || (requiresFile && !selectedFile)}
                 >
-                  ENVIAR DENÚNCIA
+                  {submitting ? "ENVIANDO..." : "ENVIAR DENÚNCIA"}
                 </Button>
               </form>
             </DialogContent>
