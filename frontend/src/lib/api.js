@@ -89,10 +89,20 @@ export const api = {
     axios.get(`${API}/reports`, { headers: getAuthHeaders(), params }),
   createReport: (data) =>
     axios.post(`${API}/reports`, data, { headers: getAuthHeaders() }),
-  createReportWithFile: (formData) =>
-    axios.post(`${API}/reports/with-file`, formData, {
+  createReportWithFile: (formData) => {
+    const params = new URLSearchParams();
+    params.append("title", formData.get("title"));
+    params.append("description", formData.get("description"));
+    params.append("target_url", formData.get("target_url"));
+    params.append("category", formData.get("category"));
+    
+    const newFormData = new FormData();
+    newFormData.append("file", formData.get("file"));
+    
+    return axios.post(`${API}/reports/with-file?${params.toString()}`, newFormData, {
       headers: { ...getAuthHeaders(), "Content-Type": "multipart/form-data" },
-    }),
+    });
+  },
   acceptReport: (reportId) =>
     axios.post(`${API}/reports/${reportId}/accept`, {}, { headers: getAuthHeaders() }),
   rejectReport: (reportId) =>
